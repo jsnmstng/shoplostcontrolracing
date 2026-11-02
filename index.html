@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LCR Dash Builder</title>
+<meta name="description" content="Build your Lost Control Racing digital dash: carb/analog, Holley EFI or GM E38 — pick your sensors, gauges and artwork.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=Orbitron:wght@600;700;800;900&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+  /* Deliberately single-theme: the product is a night-lit instrument cluster. */
+  :root {
+    color-scheme: dark;
+    --ground: #07090c;
+    --panel: #0d1218;
+    --panel-2: #121922;
+    --line: #1f2a36;
+    --line-2: #2c3a4a;
+    --text: #e8eef5;
+    --muted: #8a99aa;
+    --accent: #168cff;
+    --accent-ink: #051222;
+    --amber: #ffb020;
+    --red: #ff3b30;
+    --green: #3ddc84;
+    --display: "Orbitron", "Arial Black", sans-serif;
+    --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --label: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { background: var(--ground); color: var(--text); margin: 0; }
+  body { font: 400 16px/1.55 var(--body); padding-inline: 16px; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap { max-width: 1320px; margin-inline: auto; }
+
+  /* top bar */
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; border-bottom: 1px solid var(--line); }
+  .bar__brand { display: flex; align-items: center; gap: 14px; }
+  .bar__brand img { height: 34px; width: auto; }
+  .bar__name { font: 600 13px/1.2 var(--label); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+  .bar__name b { display: block; color: var(--text); font: 800 15px/1.2 var(--display); letter-spacing: .08em; }
+  .bar nav { display: flex; gap: 20px; font: 600 14px var(--label); letter-spacing: .08em; text-transform: uppercase; }
+  .bar nav a { color: var(--muted); text-decoration: none; }
+  .bar nav a:hover { color: var(--text); }
+
+  /* intro */
+  .intro { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; align-items: end; padding-block: 40px 28px; }
+  .intro h1 { font: 800 clamp(30px, 4.4vw, 52px)/1.05 var(--display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+  .intro h1 em { font-style: normal; color: var(--accent); }
+  .intro p { margin: 0; color: var(--muted); max-width: 52ch; font-size: 17px; }
+
+  /* builder layout */
+  .builder { display: grid; grid-template-columns: minmax(0, 430px) minmax(0, 1fr); gap: 28px; align-items: start; padding-bottom: 56px; }
+  .preview { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); order: 2; }
+  .controls { order: 1; }
+
+  #stage { position: relative; background: #020304; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; aspect-ratio: 1968 / 799; }
+  #dash { display: block; width: 100%; height: auto; opacity: 0; transition: opacity .5s ease; }
+  #stage.is-ready #dash { opacity: 1; }
+  #stage .loading { position: absolute; inset: 0; display: grid; place-items: center; font: 600 13px var(--label); letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+  #stage.is-ready .loading { display: none; }
+  #stage.is-error .loading::after { content: " — artwork failed to load"; }
+  .preview__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+  .chip { font: 600 13px var(--label); letter-spacing: .06em; text-transform: uppercase; padding: 5px 11px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); }
+  .chip--price { color: var(--amber); border-color: rgba(255,176,32,.35); }
+  .preview__meta .ghost { margin-left: auto; }
+  .preview__fine { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+
+  /* steps */
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 18px; }
+  .steps__tab { appearance: none; border: 0; background: none; color: var(--muted); padding: 10px 2px 8px; text-align: left; border-top: 3px solid var(--line); font: 700 12px/1.2 var(--label); letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
+  .steps__tab span { display: block; font: 800 12px var(--display); margin-bottom: 3px; letter-spacing: .05em; }
+  .steps__tab.is-on { color: var(--text); border-top-color: var(--accent); }
+  .step h2 { font: 800 21px/1.2 var(--display); margin: 0 0 6px; letter-spacing: .02em; }
+  .step > .hint { color: var(--muted); margin: 0 0 18px; }
+
+  .plats { display: grid; gap: 10px; }
+  .plat { display: grid; gap: 3px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; position: relative; }
+  .plat input, .theme input { position: absolute; opacity: 0; pointer-events: none; }
+  .plat:hover, .theme:hover { border-color: var(--line-2); }
+  .plat.is-on, .theme.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 24px -8px var(--accent); }
+  .plat:has(input:focus-visible), .theme:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .plat__label { font: 800 17px var(--display); letter-spacing: .02em; }
+  .plat__tag { color: var(--text); }
+  .plat__proof { font: 500 13px var(--mono); color: var(--green); }
+  .plat__proof::before { content: "● "; }
+  .plat__price { position: absolute; top: 16px; right: 18px; font: 600 12px var(--label); letter-spacing: .08em; text-transform: uppercase; color: var(--amber); }
+
+  .lede { margin: 0 0 12px; }
+  .bus, .incl { font: 400 13px/1.5 var(--mono); color: var(--muted); margin: 0 0 16px; }
+  .bus span, .incl span { display: block; font: 700 11px var(--label); letter-spacing: .16em; text-transform: uppercase; color: var(--text); margin-bottom: 2px; }
+  .rows { display: grid; gap: 12px; margin-bottom: 16px; }
+  .row__label, .slot label, .field label { display: block; font: 700 12px var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .row__ctl { display: flex; gap: 8px; align-items: center; }
+  .row__note { margin: 5px 0 0; font-size: 13px; color: var(--muted); }
+  select, input[type=text], input[type=email], input[type=tel], textarea {
+    width: 100%; min-width: 0; background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 8px;
+    padding: 9px 10px; font: 500 15px var(--body);
+  }
+  textarea { resize: vertical; }
+  select:focus, input:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(22,140,255,.25); }
+  .tier { flex: none; font: 700 10.5px var(--label); letter-spacing: .1em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
+  .tier--proven { color: var(--green); background: rgba(61,220,132,.1); border: 1px solid rgba(61,220,132,.3); }
+  .tier--build { color: #7fbcff; background: rgba(22,140,255,.1); border: 1px solid rgba(22,140,255,.32); }
+  .tier--calibrate { color: var(--amber); background: rgba(255,176,32,.1); border: 1px solid rgba(255,176,32,.32); }
+  .legend { font-size: 13px; color: var(--muted); line-height: 2; }
+  .chan-h { font: 700 12px var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 6px 0 8px; }
+  .chans { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .chans li { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 12px; background: var(--panel); font-size: 14.5px; }
+
+  .themes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .theme { display: grid; gap: 4px; padding: 8px 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; position: relative; }
+  .theme img { border-radius: 7px; aspect-ratio: 5 / 2; object-fit: cover; width: 100%; }
+  .theme__name { font: 800 14px var(--display); padding-inline: 4px; }
+  .theme__note { font-size: 12.5px; color: var(--muted); padding-inline: 4px; line-height: 1.4; }
+  .group { margin-bottom: 18px; }
+  .group > .row__label { margin-bottom: 8px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px 6px 7px; border-radius: 999px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); font: 600 13px var(--label); letter-spacing: .04em; cursor: pointer; }
+  .swatch span { width: 16px; height: 16px; border-radius: 50%; background: var(--sw); box-shadow: 0 0 10px var(--sw); }
+  .swatch.is-on { border-color: var(--sw); box-shadow: inset 0 0 0 1px var(--sw); }
+  .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .warn { display: block; margin-top: 4px; font: 600 12px var(--label); color: var(--amber); letter-spacing: .04em; }
+  .seg { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 15px; }
+  .seg label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .file { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .file small { color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .fixed-note { background: var(--panel); border: 1px dashed var(--line-2); border-radius: 10px; padding: 12px 14px; color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+
+  .field { margin-bottom: 12px; }
+  .sheet { white-space: pre-wrap; font: 400 13px/1.6 var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; margin: 0 0 16px; overflow-x: auto; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .sheet-head code { font: 500 13px var(--mono); color: var(--accent); }
+  .result { margin: 12px 0 0; font-size: 15px; }
+  .result--ok { color: var(--green); }
+  .result--err { color: var(--amber); }
+  #final textarea { font: 400 13px/1.55 var(--mono); height: 220px; margin-top: 10px; }
+
+  .btn, .ghost { appearance: none; cursor: pointer; border-radius: 9px; font: 700 14px var(--label); letter-spacing: .12em; text-transform: uppercase; padding: 11px 18px; }
+  .btn { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+  .btn:hover { filter: brightness(1.12); }
+  .ghost { background: transparent; color: var(--text); border: 1px solid var(--line-2); }
+  .ghost:hover { border-color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .nav .btn { margin-left: auto; }
+
+  /* process + platforms explainer */
+  .band { border-top: 1px solid var(--line); padding-block: 48px; }
+  .band h2 { font: 800 clamp(22px, 2.6vw, 30px)/1.15 var(--display); margin: 0 0 24px; text-wrap: balance; }
+  .process { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .process li { counter-increment: s; border-top: 1px solid var(--line-2); padding-top: 14px; color: var(--muted); font-size: 15px; }
+  .process li::before { content: counter(s, decimal-leading-zero); display: block; font: 800 13px var(--display); color: var(--accent); margin-bottom: 8px; }
+  .process b { display: block; color: var(--text); font: 700 17px var(--label); letter-spacing: .04em; margin-bottom: 4px; }
+  .specs { overflow-x: auto; }
+  .specs table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 14.5px; }
+  .specs th, .specs td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .specs th { font: 700 12px var(--label); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .specs td:first-child { font: 800 14px var(--display); white-space: nowrap; }
+  .specs .mono { font: 400 13px var(--mono); color: var(--muted); }
+  footer { border-top: 1px solid var(--line); padding-block: 24px 40px; color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+  @media (max-width: 1020px) {
+    .builder { grid-template-columns: minmax(0, 1fr); }
+    .preview { position: static; order: 0; }
+    .controls { order: 1; }
+    .intro { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-block: 28px 20px; }
+    .process { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 560px) {
+    .bar nav { display: none; }
+    .themes, .slots, .two, .process { grid-template-columns: minmax(0, 1fr); }
+    .steps__tab { font-size: 10.5px; letter-spacing: .08em; }
+    .plat__price { position: static; }
+    .preview__meta .ghost { margin-left: 0; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) { #dash { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="bar__brand">
+      <img src="assets/lcr-logo.png" alt="Lost Control Racing">
+      <div class="bar__name"><b>DIGITAL DASH</b>Builder</div>
+    </div>
+    <nav aria-label="Page">
+      <a href="#build">Build</a>
+      <a href="#platforms-info">Platforms</a>
+      <a href="#how">How it ships</a>
+    </nav>
+  </header>
+
+  <section class="intro">
+    <h1>Your engine. Your gauges. <em>Our cluster.</em></h1>
+    <p>Three platforms, one 12.3-inch widescreen cluster: carb-and-senders, Holley EFI, or GM E38. Pick how your engine talks, choose the artwork, and send us the build sheet. The preview is the real LCR artwork running a demo pass.</p>
+  </section>
+
+  <section class="builder" id="build">
+    <div class="preview">
+      <div id="stage"><canvas id="dash" aria-label="Live preview of your dash artwork"></canvas><div class="loading">Warming up the cluster</div></div>
+      <div class="preview__meta">
+        <span class="chip" id="chip-platform"></span>
+        <span class="chip" id="chip-theme"></span>
+        <span class="chip chip--price" id="chip-price"></span>
+        <button type="button" class="ghost" id="demo" aria-pressed="true">Pause demo pass</button>
+      </div>
+      <p class="preview__fine">Demo values, not a live feed. Your final artwork is made by LCR from this build sheet for your 12.3-inch screen.</p>
+    </div>
+
+    <div class="controls">
+      <div class="steps" role="list">
+        <button type="button" class="steps__tab" role="listitem"><span>01</span>Engine</button>
+        <button type="button" class="steps__tab" role="listitem"><span>02</span>Inputs</button>
+        <button type="button" class="steps__tab" role="listitem"><span>03</span>Artwork</button>
+        <button type="button" class="steps__tab" role="listitem"><span>04</span>Send</button>
+      </div>
+
+      <section class="step">
+        <h2>How does your engine talk?</h2>
+        <p class="hint">Pick the one that matches what's under the hood. You can change it any time.</p>
+        <div class="plats" id="platforms"></div>
+      </section>
+
+      <section class="step" hidden>
+        <h2>Inputs</h2>
+        <p class="hint">Tell us what's installed. Defaults are our recommended setup.</p>
+        <div id="inputs"></div>
+      </section>
+
+      <section class="step" hidden>
+        <h2>Artwork</h2>
+        <p class="hint">Both styles are finished LCR artwork. Colors change live in the preview.</p>
+        <div class="themes" id="themes"></div>
+        <div class="group">
+          <span class="row__label">Accent color</span>
+          <div class="swatches" id="accents"></div>
+        </div>
+        <p class="fixed-note" id="fixed-note">Carbon Pro ships with its race faces: oil, water, volts, nitrous, plus fuel pressure, IAT and AFR readouts. Want different faces? Switch to Blue Lightning, or note it on the build sheet and we'll re-letter them.</p>
+        <div id="custom-only">
+          <div class="group">
+            <span class="row__label">Your four round gauges</span>
+            <div class="slots" id="slots"></div>
+          </div>
+          <div class="group">
+            <span class="row__label">Nameplate</span>
+            <div class="seg" role="radiogroup" aria-label="Nameplate">
+              <label><input type="radio" name="plate" id="plate-text-opt" value="text"> Your text</label>
+              <label><input type="radio" name="plate" id="plate-logo-opt" value="logo"> Your logo</label>
+              <label><input type="radio" name="plate" id="plate-stock-opt" value="stock"> LCR stock</label>
+            </div>
+            <div id="plate-text-row"><input type="text" id="plate-text" maxlength="22" placeholder="e.g. CHEVELLE LS3" aria-label="Nameplate text"></div>
+            <div id="plate-logo-row" class="file" hidden>
+              <input type="file" id="logo" accept="image/png,image/jpeg,image/svg+xml,image/webp" aria-label="Upload your logo">
+              <small id="logo-name"></small>
+            </div>
+          </div>
+        </div>
+        <div class="group two">
+          <div><label class="row__label" for="speed-unit">Speed</label>
+            <select id="speed-unit"><option value="mph">MPH</option><option value="kmh">km/h</option></select></div>
+          <div><label class="row__label" for="temp-unit">Temperature</label>
+            <select id="temp-unit"><option value="F">°F</option><option value="C">°C</option></select></div>
+        </div>
+        <div class="group">
+          <label class="row__label" for="shift-rpm">Shift light · <span id="shift-rpm-out"></span> rpm</label>
+          <input type="range" id="shift-rpm" min="4500" max="8000" step="100">
+        </div>
+      </section>
+
+      <section class="step" hidden>
+        <h2>Send your build</h2>
+        <p class="hint">No payment here. We confirm your inputs with you, then quote the build.</p>
+        <div class="sheet-head"><span class="row__label">Your build sheet</span><code id="build-id"></code></div>
+        <pre class="sheet" id="sheet"></pre>
+        <form id="order" novalidate>
+          <div class="two">
+            <div class="field"><label for="c-name">Name</label><input type="text" id="c-name" autocomplete="name"></div>
+            <div class="field"><label for="c-phone">Phone</label><input type="tel" id="c-phone" autocomplete="tel"></div>
+          </div>
+          <div class="field"><label for="c-email">Email</label><input type="email" id="c-email" autocomplete="email"></div>
+          <div class="field"><label for="c-vehicle">Vehicle</label><input type="text" id="c-vehicle" placeholder="Year, make, model, engine"></div>
+          <div class="field"><label for="c-notes">Anything else</label><textarea id="c-notes" rows="3" placeholder="Sender part numbers, trans, tire size, timeline…"></textarea></div>
+          <button class="btn" type="submit">Send build sheet</button>
+          <p class="result" id="order-result" role="status"></p>
+        </form>
+        <div id="final" hidden>
+          <textarea id="final-text" readonly aria-label="Build sheet to send"></textarea>
+          <button type="button" class="ghost" id="copy">Copy build sheet</button>
+        </div>
+      </section>
+
+      <div class="nav">
+        <button type="button" class="ghost" id="back">Back</button>
+        <button type="button" class="btn" id="next">Next</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="platforms-info">
+    <h2>Three platforms, one cluster</h2>
+    <div class="specs">
+      <table>
+        <thead><tr><th>Platform</th><th>How it connects</th><th>What it reads</th><th>Built for</th></tr></thead>
+        <tbody>
+          <tr><td>Carb / Analog</td><td class="mono">LCR sensor module → dash, 20 Hz. Opto-isolated tach, pulse VSS, 0.5–4.5 V and resistive senders.</td><td>RPM, speed, oil &amp; fuel pressure, water &amp; oil temp, fuel level, AFR, boost, nitrous, volts, indicators</td><td>Carbureted street, strip and nitrous cars</td></tr>
+          <tr><td>Holley EFI</td><td class="mono">Racepak CAN port · 1 Mbps · 29-bit extended</td><td>RPM, coolant, oil pressure, MAP/boost, AFR &amp; target, timing, IAT, gear — plus more confirmed at install</td><td>Terminator X, Terminator X Max and Dominator swaps</td></tr>
+          <tr><td>GM E38</td><td class="mono">GM high-speed CAN · 500 kbps · 11-bit + OBD2 fallback</td><td>RPM, coolant, oil pressure, speed, PRNDL, volts, fuel level where the PCM has it</td><td>LS3 / Gen 4 crate swaps, trucks and restomods</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <h2>How it ships</h2>
+    <ol class="process">
+      <li><b>You send the build sheet</b>Platform, sensors, gauges and artwork from this page.</li>
+      <li><b>We confirm your inputs</b>Sender part numbers, ECU, trans and tire size — anything marked "We calibrate" gets sorted here.</li>
+      <li><b>We build and calibrate</b>Ranges, pulses-per-mile and sender curves set on the bench; artwork finished for your 12.3-inch screen.</li>
+      <li><b>Install and first drive</b>Every build gets a setup check on your vehicle, and speed is verified against GPS.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>Lost Control Racing</span>
+    <span>Display only — the dash reads your engine, it never changes your tune.</span>
+  </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
